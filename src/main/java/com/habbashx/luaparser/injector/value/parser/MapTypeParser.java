@@ -1,5 +1,6 @@
 package com.habbashx.luaparser.injector.value.parser;
 
+import com.habbashx.luaparser.exception.LuaParserException;
 import com.habbashx.luaparser.injector.LuaInjector;
 import com.habbashx.luaparser.parser.ValueParserFactory;
 import org.luaj.vm2.LuaValue;
@@ -24,12 +25,14 @@ public class MapTypeParser implements FieldTypeParser{
     }
 
     @Override
-    public void inject(final Object target, final Field field, final LuaValue value, final LuaInjector injector) {
+    public Object parse(final Field field, final LuaValue value, final LuaInjector injector) {
 
         try {
-            if (!value.istable()) return;
+            if (!value.istable()) throw new LuaParserException("Expected Lua table for map field: "+field.getName());
 
-            final ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
+            if (!(field.getGenericType() instanceof ParameterizedType parameterizedType)) {
+                throw new RuntimeException("Map field must be parameterized: " + field.getName());
+            }
 
             final Class<?> keyType = (Class<?>) parameterizedType.getActualTypeArguments()[0];
             final Class<?> valueType = (Class<?>) parameterizedType.getActualTypeArguments()[1];
@@ -48,7 +51,7 @@ public class MapTypeParser implements FieldTypeParser{
                 final Object val;
 
                 if (injector.isComplexType(valueType)) {
-                    Object nested = valueType.getDeclaredConstructor().newInstance();
+                    final Object nested = valueType.getDeclaredConstructor().newInstance();
                     injector.injectObject(nested, v);
                     val = nested;
                 } else {
@@ -56,7 +59,7 @@ public class MapTypeParser implements FieldTypeParser{
                 }
                 map.put(key,val);
             }
-            field.set(target,map);
+            return map;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

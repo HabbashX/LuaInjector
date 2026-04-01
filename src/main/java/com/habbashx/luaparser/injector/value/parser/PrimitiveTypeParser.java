@@ -30,14 +30,13 @@ public class PrimitiveTypeParser implements FieldTypeParser {
     }
 
     @Override
-    public void inject(final Object target, final Field field, final LuaValue value, final LuaInjector injector) {
+    public Object parse(final Field field, final LuaValue value, final LuaInjector injector) {
 
         try {
-            final Object parsedValue = ValueParserFactory.parse(field.getType(),value);
-            field.setAccessible(true);
-            field.set(target,parsedValue);
+            return ValueParserFactory.parse(field.getType(),value);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
+
 }

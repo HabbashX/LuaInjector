@@ -13,6 +13,7 @@ public class ValidationContext {
     private final LuaInjector luaInjector;
 
     public ValidationContext(Object target,Object value, Field field, LuaInjector luaInjector) {
+        this.target = target;
         this.value = value;
         this.field = field;
         this.luaInjector = luaInjector;

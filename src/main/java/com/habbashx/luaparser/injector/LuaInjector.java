@@ -1,7 +1,10 @@
 package com.habbashx.luaparser.injector;
 
 
+import com.habbashx.luaparser.annotation.*;
 import com.habbashx.luaparser.injector.value.parser.*;
+import com.habbashx.luaparser.validation.*;
+import com.habbashx.luaparser.validation.registry.ValidationRegistry;
 import org.jetbrains.annotations.NotNull;
 import org.luaj.vm2.Globals;
 import org.luaj.vm2.LuaValue;
@@ -26,10 +29,10 @@ import java.lang.reflect.Field;
 public class LuaInjector {
 
     private final Globals globals = JsePlatform.standardGlobals();
-
     private final LuaValue root;
 
     private final ParserRegistry parserRegistry = new ParserRegistry();
+    private final ValidationRegistry validationRegistry = new ValidationRegistry();
 
     /**
      * Creates an injector and loads a Lua file.
@@ -39,10 +42,9 @@ public class LuaInjector {
     public LuaInjector(String file) {
         final LuaValue chunk = globals.loadfile(file);
         this.root = chunk.call();
-
         registerParsers();
+        registerValidators();
     }
-
 
     /**
      * Creates an injector from an already evaluated LuaValue (table).
@@ -52,6 +54,7 @@ public class LuaInjector {
     public LuaInjector(LuaValue root) {
         this.root = root;
         registerParsers();
+        registerValidators();
     }
 
 
@@ -79,21 +82,29 @@ public class LuaInjector {
      */
     public void injectObject(@NotNull final Object target, final LuaValue table) {
 
-        Field[] fields = target.getClass().getDeclaredFields();
+        final Field[] fields = target.getClass().getDeclaredFields();
 
         try {
-            for (Field field : fields) {
+            for (final Field field : fields) {
                 field.setAccessible(true);
 
-                String key = field.getName();
+                final String key = field.getName();
 
                 LuaValue value = table.get(key);
 
-                if (value.isnil()) continue;
+                if (value.isnil()) {
+                    if (field.isAnnotationPresent(LuaDefaultValue.class)) {
+                        final LuaDefaultValue defaultValue = field.getAnnotation(LuaDefaultValue.class);
+                        value = LuaValue.valueOf(defaultValue.value());
+                    }
+                }
 
-                FieldTypeParser handler = parserRegistry.resolve(field.getType());
+                final FieldTypeParser parser = parserRegistry.resolve(field.getType());
 
-                handler.inject(target, field, value, this);
+                final Object parsedObject = parser.parse(field, value, this);
+
+                field.set(target,parsedObject);
+                validationRegistry.validate(target,parsedObject,field,this);
             }
 
         } catch (Exception e) {
@@ -132,11 +143,23 @@ public class LuaInjector {
      * </ul>
      */
     private void registerParsers() {
+        parserRegistry.register(new ObjectTypeParser());
         parserRegistry.register(new PrimitiveTypeParser());
         parserRegistry.register(new ListTypeParser());
         parserRegistry.register(new MapTypeParser());
-        parserRegistry.register(new ObjectTypeParser());
+        parserRegistry.register(new AdaptTypeParser());
+        parserRegistry.register(new EnumTypeParser());
     }
+
+    private void registerValidators() {
+        validationRegistry.register(Condition.class ,new ConditionValidator());
+        validationRegistry.register(LuaRequired.class,new RequiredValidator());
+        validationRegistry.register(LuaMin.class,new MinValidator());
+        validationRegistry.register(LuaMax.class,new MaxValidator());
+        validationRegistry.register(LuaPattern.class,new PatternValidator());
+        validationRegistry.register(LuaRange.class,new RangeValidator());
+    }
+
 
     /** @return Lua root table */
     public LuaValue getRoot() {
@@ -151,5 +174,9 @@ public class LuaInjector {
     /** @return parser registry used for type resolution */
     public ParserRegistry getParserRegistry() {
         return parserRegistry;
+    }
+
+    public ValidationRegistry getValidationRegistry() {
+        return validationRegistry;
     }
 }

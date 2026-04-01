@@ -3,7 +3,10 @@ package com.habbashx.luaparser.injector.value.parser;
 import com.habbashx.luaparser.injector.LuaInjector;
 import org.luaj.vm2.LuaValue;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Handles nested object injection.
@@ -14,17 +17,28 @@ public class ObjectTypeParser implements FieldTypeParser {
 
     @Override
     public boolean supports(Class<?> type) {
-        return false;
+        return  !type.isPrimitive()
+                && type != String.class
+                && !Number.class.isAssignableFrom(type)
+                && type != Boolean.class
+                && type != Character.class
+                && !type.isEnum()
+                && !Map.class.isAssignableFrom(type)
+                && !List.class.isAssignableFrom(type)
+                && !type.isArray();
     }
 
     @Override
-    public void inject(Object target, Field field, LuaValue value, LuaInjector injector) {
+    public Object parse(Field field, LuaValue value, LuaInjector injector) {
 
         try {
-            final Object nestedObject = field.getType().getConstructor().newInstance();
+
+            Constructor<?> constructor = field.getType().getConstructor();
+            constructor.setAccessible(true);
+            final Object nestedObject =constructor.newInstance();
 
             injector.injectObject(nestedObject,value);
-            field.set(target,nestedObject);
+            return nestedObject;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

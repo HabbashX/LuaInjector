@@ -26,15 +26,13 @@ public interface FieldTypeParser {
      */
     boolean supports(Class<?> type);
 
-
     /**
      * Injects Lua value into the target field.
      *
-     * @param target Java object
-     * @param field field to inject into
-     * @param value Lua value
+     * @param field    field to inject into
+     * @param value    Lua value
      * @param injector main injector (used for recursion)
      */
-    void inject(Object target, Field field, LuaValue value, LuaInjector injector);
+    Object parse(Field field, LuaValue value, LuaInjector injector);
 
 }

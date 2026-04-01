@@ -1,7 +1,9 @@
 package com.habbashx.luaparser.injector.value.parser;
 
+import com.habbashx.luaparser.exception.LuaParserException;
 import com.habbashx.luaparser.injector.LuaInjector;
 import com.habbashx.luaparser.parser.ValueParserFactory;
+import org.jetbrains.annotations.NotNull;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.Varargs;
 
@@ -31,50 +33,55 @@ public class ListTypeParser implements FieldTypeParser {
     }
 
     @Override
-    public void inject(final Object target, final Field field, final LuaValue value, final LuaInjector injector) {
+    public Object parse(final Field field, final LuaValue value, final LuaInjector injector) {
 
         try {
-
-            if (!value.istable()) return;
+            if (!value.istable()) throw new LuaParserException("Expected Lua table for array or list field "+field.getName());
 
             final Class<?> type = field.getType();
 
-            if (type.isArray()) {
+            if (type.isArray()) return injectArray(value,type);
 
-                final Class<?> component = type.getComponentType();
-                final int size = value.length();
-                final Object array = Array.newInstance(component,size);
+           return injectList(field,value);
 
-                for (int i = 1 ; i<= size ; i++) {
-                    final LuaValue val = value.get(i);
-                    final Object parsedObject = ValueParserFactory.parse(component,val);
-                    Array.set(array,i - 1 ,parsedObject);
-                }
-                field.set(target,array);
-            }
-
-
-            final ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
-            final Class<?> actualGenericsType = (Class<?>) parameterizedType.getActualTypeArguments()[0];
-
-            final List<Object> list = new ArrayList<>();
-
-            LuaValue k = LuaValue.NIL;
-
-            while (true) {
-                final Varargs n = value.next(k);
-
-                k = n.arg1();
-                if (k.isnil()) break;
-
-                final LuaValue v = n.arg(2);
-                final Object parsedObject = ValueParserFactory.parse(actualGenericsType,v);
-                list.add(parsedObject);
-            }
-            field.set(target,list);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
 
+    private Object injectArray(final LuaValue value , final Class<?> type)  {
+
+        final Class<?> component = type.getComponentType();
+        final int size = value.length();
+        final Object array = Array.newInstance(component,size);
+
+        for (int i = 1 ; i<= size ; i++) {
+            final LuaValue val = value.get(i);
+            final Object parsedObject = ValueParserFactory.parse(component, val);
+            Array.set(array, i - 1, parsedObject);
+        }
+        return array;
+    }
+
+    private Object injectList(@NotNull final Field field, final LuaValue value) throws IllegalAccessException {
+
+        if (!(field.getGenericType() instanceof ParameterizedType pt)) {
+            throw new RuntimeException("List field must be parameterized: " + field.getName());
+        }
+
+        final Class<?> actualType =
+                (Class<?>) pt.getActualTypeArguments()[0];
+
+        final int size = value.length();
+        final List<Object> list = new ArrayList<>(size);
+
+        for (int i = 1; i <= size; i++) {
+            LuaValue v = value.get(i);
+
+            Object parsed = ValueParserFactory.parse(actualType, v);
+            list.add(parsed);
+        }
+
+        return list;
     }
 }
