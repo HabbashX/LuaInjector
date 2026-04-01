@@ -1,65 +1,73 @@
-# LuaInjector 🚀
+# 📘 LuaInjector – Full Documentation
 
-A lightweight Java library that maps Lua tables directly into Java objects using reflection and a flexible strategy-based parsing system.
+## 🚀 Overview
 
-It supports primitives, nested objects, lists, arrays, and maps — making Lua a powerful configuration format for Java applications.
+LuaInjector is a lightweight, extensible configuration framework that maps Lua tables into Java objects with support for:
 
----
-
-## ✨ Features
-
-- Automatic Lua → Java object mapping
-- Supports primitive types (`int`, `boolean`, `String`, etc.)
-- Supports `List` and arrays
-- Supports `Map<K, V>`
-- Nested object injection (recursive)
-- Strategy-based parser system (extensible)
-- Reflection-based field binding
-- Custom type parsers support
+- ✅ Primitive type parsing
+- ✅ Nested object injection
+- ✅ Lists & arrays
+- ✅ Maps
+- ✅ Enum support
+- ✅ Custom type adapters
+- ✅ Annotation-driven validation system
+- ✅ Conditional validation
+- ✅ Extensible parser & validator architecture
 
 ---
 
-## 📦 Example Lua Config
+## 🧠 Core Architecture
+
+```
+Lua Script
+   ↓
+LuaValue (LuaJ)
+   ↓
+Parser System (FieldTypeParser)
+   ↓
+Java Object
+   ↓
+Validation System (Annotation-driven)
+   ↓
+Final Injected Object
+```
+
+---
+
+## ⚙️ Getting Started
+
+### 1. Create Lua Config
 
 ```lua
-return {
+config = {
     port = 8080,
-
+    name = "server",
     database = {
         host = "localhost",
         port = 3306
     },
-
-    tags = {"dev", "prod", "test"},
-
-    settings = {
-        debug = true,
-        timeout = 5000
-    }
+    users = {"admin", "guest"}
 }
 ```
 
-## ☕ Java Model
+### 2. Java Model
 
 ```java
 public class Config {
+
     public int port;
+    public String name;
     public Database database;
-    public List tags;
-    public Map settings;
+    public List<String> users;
 }
 
-class Database {
+public class Database {
     public String host;
     public int port;
 }
 ```
 
----
-
-## 🚀 Usage
-
-### Load from Lua file
+### 3. Inject
 
 ```java
 LuaInjector injector = new LuaInjector("config.lua");
@@ -68,192 +76,354 @@ Config config = new Config();
 injector.inject(config);
 ```
 
-### Load from LuaValue
-
-```java
-LuaValue table = ...;
-
-LuaInjector injector = new LuaInjector(table);
-
-Config config = new Config();
-injector.inject(config);
-```
-
 ---
 
-## 🧠 How It Works
+## 🔌 Parser System
 
-LuaInjector uses a strategy-based architecture:
+All parsing is handled using: `FieldTypeParser`
 
-```
-LuaInjector
-  → ParserRegistry
-    → FieldTypeParser (Strategy)
-      → Primitive / List / Map / Object Parsers
-        → ValueParserFactory (primitive conversion)
-```
+### Built-in Parsers
 
-Each field is handled by a dedicated parser.
+#### 1. `PrimitiveTypeParser`
 
----
-
-## 🧩 Supported Types
-
-### Primitive Types
-
+Supports:
 - `int`, `long`, `float`, `double`
-- `boolean`, `char`
+- `boolean`
+- `char`
 - `String`
-- Wrapper classes
 
-### Collections
+#### 2. `ListTypeParser`
 
-**List**
+Supports:
+- `List<T>`
+- arrays (`T[]`)
+
+> ✔ Uses numeric indexing (`1..n`)  
+> ❌ Ignores non-array keys
+
+#### 3. `MapTypeParser`
+
+Supports:
+- `Map<K, V>`
+
+> ✔ Uses Lua `next()` iteration  
+> ✔ Supports complex values
+
+#### 4. `ObjectTypeParser`
+
+Handles:
+- Custom classes (POJOs)
+
+> ✔ Recursively injects fields  
+> ✔ Requires default constructor
+
+#### 5. `EnumTypeParser`
+
+Supports Java enums:
+
 ```java
-List values;
+enum Role { ADMIN, USER }
 ```
 
-**Array**
-```java
-int[] values;
+```lua
+role = "ADMIN"
 ```
 
-**Map**
+> ✔ Case-insensitive matching
+
+#### 6. `AdaptTypeParser` (Custom Adapters)
+
+---
+
+## 🔧 Custom Type Adapters
+
+### Annotation
+
 ```java
-Map data;
+@AdaptType(UUIDAdapter.class)
+UUID id;
 ```
 
-### Nested Objects
+### Adapter Interface
 
 ```java
-class Database {
-    public String host;
+public interface TypeAdapter<T> {
+    T adapt(LuaValue value);
+}
+```
+
+### Example
+
+```java
+public class UUIDAdapter implements TypeAdapter<UUID> {
+
+    @Override
+    public UUID adapt(LuaValue value) {
+        return UUID.fromString(value.tojstring());
+    }
+}
+```
+
+---
+
+## 🧩 Validation System
+
+### Overview
+
+Validation is:
+- ✔ Annotation-driven
+- ✔ Extensible
+- ✔ Decoupled from parsing
+- ✔ Safe (no reflection in validators)
+
+### Validation Flow
+
+```
+Parsed Value
+   ↓
+ValidationRegistry
+   ↓
+Matching Validators
+   ↓
+Error handling
+```
+
+### `ValidationContext`
+
+Provides safe access:
+
+```java
+ctx.value()
+ctx.field()
+ctx.target()
+ctx.annotation(...)
+ctx.injector()
+```
+
+---
+
+## 🔒 Built-in Validators
+
+### `@Min`
+
+```java
+@Min(10)
+int port;
+```
+
+> ✔ Ensures value ≥ min
+
+### `@Max`
+
+```java
+@Max(100)
+int port;
+```
+
+> ✔ Ensures value ≤ max
+
+### `@Range`
+
+```java
+@Range(min = 1, max = 10)
+int threads;
+```
+
+> ✔ Ensures value within range
+
+### `@Pattern`
+
+```java
+@Pattern("\\w+")
+String name;
+```
+
+> ✔ Regex validation
+
+---
+
+## ⚡ Conditional Validation
+
+### `@Condition`
+
+```java
+@Condition("port == 7070") or @Condtion("port != 7070")
+@Min(10)
+int port;
+```
+
+### Behavior
+
+| Condition | Result               |
+|-----------|----------------------|
+| `false`   | validation skipped   |
+| `true`    | validation applied   |
+
+### Example
+
+```java
+public class Config {
+
+    public String env;
+
+    @Condition(field = "env", equals = "prod")
+    @Min(10)
     public int port;
 }
 ```
 
 ---
 
-## ⚙️ Architecture
+## 🧠 `ValidationRegistry`
 
-### LuaInjector
-Main engine responsible for:
-- Loading Lua scripts
-- Injecting values into Java objects
-- Managing the parser system
+Central dispatcher:
 
-### ParserRegistry
-Stores and resolves type handlers dynamically.
+```java
+Map<Annotation, FieldValidator>
+```
 
-### FieldTypeParser
-Strategy interface for type-specific injection logic.
-
-### ValueParserFactory
-Converts `LuaValue` → Java primitive types.
+> ✔ Maps annotation → validator  
+> ✔ Executes only matching validators  
+> ✔ Supports custom validators
 
 ---
 
-## 🧪 Injection Process
+## 🔌 Creating Custom Validators
 
-1. Load Lua table
-2. Match Lua keys with Java fields
-3. Resolve parser based on field type
-4. Convert `LuaValue` → Java type
-5. Inject via reflection
-6. Recursively inject nested objects
+### Step 1: Implement
+
+```java
+public class MyValidator implements FieldValidator {
+
+    @Override
+    public void validate(ValidationContext ctx) {
+        // custom logic
+    }
+}
+```
+
+### Step 2: Register
+
+```java
+validationRegistry.register(MyAnnotation.class, new MyValidator());
+```
+
+### Step 3: Use
+
+```java
+@MyAnnotation
+String field;
+```
 
 ---
 
-## 🔥 Example Flow
+## 🧠 Parser Registry
 
-**Lua:**
+Handles parser resolution:
+
+```java
+FieldTypeParser resolve(Class<?> type)
+```
+
+### Order Matters
+
+| Priority | Parser               |
+|----------|----------------------|
+| 1        | `AdaptTypeParser`    |
+| 2        | `EnumTypeParser`     |
+| 3        | `ListTypeParser`     |
+| 4        | `MapTypeParser`      |
+| 5        | `ObjectTypeParser`   |
+| 6        | `PrimitiveTypeParser`|
+
+---
+
+## ⚠️ Important Rules
+
+### Lua Tables
+
+| Structure     | Supported |
+|---------------|-----------|
+| `{1,2,3}`     | ✅ List   |
+| `{a=1}`       | ✅ Map    |
+| `{1,2,a=3}`   | ❌ Not supported |
+
+### Arrays vs Maps
+
+- **Arrays** → `length()` + `get(i)`
+- **Maps** → `next()`
+
+### Object Requirements
+
+- Must have default constructor
+- Fields must be accessible
+
+
+## 🚀 Advanced Features
+
+#### ✔ Nested Object Injection
+
+```java
+class A {
+    B b;
+}
+```
+
+> ✔ Automatically resolved
+
+#### ✔ Nested Collections
+
+```java
+List<Database>
+Map<String, List<Integer>>
+```
+
+> ✔ Supported via recursive parsing
+
+#### ✔ Custom Adapters
+> ✔ Plug any type conversion
+
+#### ✔ Conditional Validation
+> ✔ Dynamic rules
+
+#### ✔ Extensible Architecture
+- Add parsers
+- Add validators
+- Add adapters
+
+---
+
+## 🧠 Best Practices
+
+**Keep Lua clean:**
+
 ```lua
-db = {
-    host = "localhost"
-}
+users = {"a", "b", "c"}  -- ✔ good
+users = {1, 2, name="bad"} -- ❌ bad
 ```
 
-**Java:**
-```java
-Database db;
-```
-
-**Flow:**
-```
-Lua table → ObjectTypeParser → new Database() → recursive injection → field assignment
-```
-
----
-
-## 🧩 Extending the System
-
-```java
-public interface FieldTypeParser {
-    boolean supports(Class type);
-    void inject(Object target, Field field, LuaValue value, LuaInjector injector);
-}
-```
-
-**Register your custom parser:**
-
-```java
-parserRegistry.register(new CustomParser());
-```
-
----
-
-## ⚡ Performance Notes
-
-- Reflection-based injection
-- Strategy lookup per field
-- Designed for configuration use cases
-- Not intended for high-frequency runtime execution
-
----
-
-## 🛠 Requirements
-
-- Java 17
-- LuaJ library
-
-## 📦 Maven Dependency
-
-```xml
-
-    org.luaj
-    luaj-jse
-    3.0.1
-
-```
+- ✔ Always use parameterized collections: `List<String>` not `List`
+- ✔ Use adapters for complex types
+- ✔ Keep validators small & focused
 
 ---
 
 ## 🚀 Future Improvements
 
-- Annotation mapping (`@LuaNode`)
-- Field caching for performance
-- Strict validation mode
-- Hot reload system
-- Schema validation
-- Plugin-based parser system
+- 🔥 Dot-path mapping (`db.host`)
+- ⚡ Reflection caching
+- 🧠 Expression engine for conditions
+- 📦 Config reloading
+- 🔒 Sandbox Lua execution
+- 📊 Schema generation
 
 ---
 
-## 📜 License
+## 🏁 Summary
 
-MIT License
+LuaInjector provides:
 
----
-
-## ⭐ Purpose
-
-LuaInjector was built to make Lua a clean, flexible, and powerful configuration format for Java systems — with minimal boilerplate and maximum extensibility.
-
----
-
-## 🤝 Contributing
-
-- Add new parsers
-- Improve performance
-- Add validation systems
-- Build plugins
+- ✔ Clean separation (Parsing / Validation / Injection)
+- ✔ High extensibility
+- ✔ Annotation-driven configuration
+- ✔ Safe and maintainable architecture
